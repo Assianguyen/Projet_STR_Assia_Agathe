@@ -337,8 +337,10 @@ void Tasks::ReceiveFromMonTask(void *arg) {
             rt_sem_v(&sem_openComRobot);
         } else if (msgRcv->CompareID(MESSAGE_CAM_OPEN)) {
             rt_sem_v(&sem_startCamera);
+            cout<<"renvoi sem start caméra"<<endl<<flush;
         }else if (msgRcv->CompareID(MESSAGE_CAM_CLOSE)) {
             rt_sem_v(&sem_stopCamera);
+            cout<<"renvoi sem stop caméra"<<endl<<flush;
         }else if (msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD) || 
             msgRcv->CompareID(MESSAGE_ROBOT_START_WITH_WD)) {
             if(msgRcv->CompareID(MESSAGE_ROBOT_START_WITHOUT_WD)){
@@ -406,27 +408,6 @@ void Tasks::StartRobotTask(void *arg) {
     /**************************************************************************************/
     /* The task startRobot starts here                                                    */
     /**************************************************************************************/
-//    while (1) {
-//       
-//        Message * msgSend;
-//        rt_sem_p(&sem_startRobot, TM_INFINITE);
-//        cout << "Start robot without watchdog (";
-//        rt_mutex_acquire(&mutex_robot, TM_INFINITE);
-//        msgSend = robot.Write(robot.StartWithoutWD());
-//        rt_mutex_release(&mutex_robot);
-//        cout << msgSend->GetID();
-//        cout << ")" << endl;
-//
-//        cout << "Movement answer: " << msgSend->ToString() << endl << flush;
-//        WriteInQueue(&q_messageToMon, msgSend);  // msgSend will be deleted by sendToMon
-//
-//        if (msgSend->GetID() == MESSAGE_ANSWER_ACK) {
-//            rt_mutex_acquire(&mutex_robotStarted, TM_INFINITE);
-//            robotStarted = 1;
-//            rt_mutex_release(&mutex_robotStarted);
-//        }
-//    
-//    }
     
     while (1) {
        
@@ -434,8 +415,10 @@ void Tasks::StartRobotTask(void *arg) {
         
         rt_sem_p(&sem_startRobot, TM_INFINITE);
         
-        cout << "Test avant if" << endl << flush;
+        //cout << "Test avant if" << endl << flush;
         
+        
+        //start without watchdog
          if (WD == 0) {
             cout << "Start robot without watchdog (";
             rt_mutex_acquire(&mutex_robot, TM_INFINITE);
@@ -447,7 +430,7 @@ void Tasks::StartRobotTask(void *arg) {
             cout << "Movement answer: " << msgSend->ToString() << endl << flush;
             WriteInQueue(&q_messageToMon, msgSend);
             
-            cout << "Test dans if" << endl << flush;
+            //cout << "Test dans if" << endl << flush;
             
          }
          else if (WD == 1){
@@ -462,7 +445,7 @@ void Tasks::StartRobotTask(void *arg) {
             cout << "Movement answer: " << msgSend->ToString() << endl << flush;
             WriteInQueue(&q_messageToMon, msgSend);
             
-            cout << "Test dans if" << endl << flush;
+            //cout << "Test dans if" << endl << flush;
             rt_sem_v(&sem_watchdog);
             
           
@@ -490,17 +473,18 @@ void Tasks::StartRobotTask(void *arg) {
  * @brief Thread handling the watchdog.
  */
 void Tasks::WatchdogTask(void *arg) {
-    rt_sem_p(&sem_barrier, TM_INFINITE);
     
+    // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
     rt_sem_p(&sem_watchdog, TM_INFINITE);
    // cout<<"on est dans la task WD"<<endl<<flush; 
     cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
-    // Synchronization barrier (waiting that all tasks are starting)
     
-       
     //tache periodique de 1 sec (WD)
     
     rt_task_set_periodic(NULL, TM_NOW, 1000000000);
+    
+//    Version task avec gestion du compteur 
 //    int counter_WD=0;
 //    Message * msgSend;
 //    while(counter_WD < 3){
@@ -530,6 +514,8 @@ void Tasks::WatchdogTask(void *arg) {
 //        }
 //    }
     
+    
+//    Version task sans gestion du compteur    
     while (1){
         Message * msgSend;
         rt_task_wait_period(NULL);
@@ -596,7 +582,7 @@ void Tasks::MoveTask(void *arg) {
 
 
 /**
- * @brief Thread sendin the battery's level.
+ * @brief Thread sending the battery's level.
  */
 
 void Tasks::BatteryTask(void *arg) {
@@ -634,37 +620,41 @@ void Tasks::BatteryTask(void *arg) {
  */
 
 void Tasks::StartCameraTask(void *arg) {
-    rt_sem_p(&sem_barrier, TM_INFINITE);
-    rt_sem_p(&sem_startCamera, TM_INFINITE);
     
-    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
     
-    
-    Message * msgSend;
-    
-    
-    /**************************************************************************************/
-    /* The task starts here                                                               */
-    /**************************************************************************************/
-    
-    bool camOpen = false;
-    bool camIsOpen = false;
+    while(1){
+     
+        rt_sem_p(&sem_startCamera, TM_INFINITE);
+        cout<<"test start après sem caméra"<<endl<<flush;
+        cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
 
-    //cout << "on essaie d ouvrir la cam" << endl << flush;
+        //Message * msgSend;
 
-    rt_mutex_acquire(&mutex_camera, TM_INFINITE);
-    camOpen = camera.Open();
-    camIsOpen = camera.IsOpen();
-    rt_mutex_release(&mutex_camera);
-        
-    if (camIsOpen == false) {
-        cout << "MESSAGE_ERROR_START_CAM" << endl << flush;
+
+        /**************************************************************************************/
+        /* The task starts here                                                               */
+        /**************************************************************************************/
+
+        bool camOpen = false;
+        bool camIsOpen = false;
+
+        //cout << "on essaie d ouvrir la cam" << endl << flush;
+
+        rt_mutex_acquire(&mutex_camera, TM_INFINITE);
+        camOpen = camera.Open();
+        camIsOpen = camera.IsOpen();
+        rt_mutex_release(&mutex_camera);
+
+        if (camIsOpen == false) {
+            cout << "MESSAGE_ERROR_START_CAM" << endl << flush;
+        }
+        else if (camIsOpen == true) {
+            cout << "La camera est ouverte !" << endl << flush;
+        }
+
     }
-    else if (camIsOpen == true) {
-        cout << "La camera est ouverte !" << endl << flush;
-    }
-       
 }
 
 /**
@@ -672,40 +662,45 @@ void Tasks::StartCameraTask(void *arg) {
  */
 
 void Tasks::StopCameraTask(void *arg) {
-    rt_sem_p(&sem_barrier, TM_INFINITE);
-    rt_sem_p(&sem_stopCamera, TM_INFINITE);
     
-    cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
     // Synchronization barrier (waiting that all tasks are starting)
+    rt_sem_p(&sem_barrier, TM_INFINITE);
     
     
-    Message * msgSend;
-    
-    
-    /**************************************************************************************/
-    /* The task starts here                                                               */
-    /**************************************************************************************/
-    
-        
-    bool camIsOpen = false;
+    while(1){
+        rt_sem_p(&sem_stopCamera, TM_INFINITE);
+        cout<<"test start après sem caméra"<<endl<<flush;
+        cout << "Start " << __PRETTY_FUNCTION__ << endl << flush;
 
-    rt_mutex_acquire(&mutex_camera, TM_INFINITE);
-    camera.Close();
-    camIsOpen = camera.IsOpen();
-    rt_mutex_release(&mutex_camera);
 
-    while(camIsOpen == true){
+
+        //Message * msgSend;
+
+
+        /**************************************************************************************/
+        /* The task starts here                                                               */
+        /**************************************************************************************/
+
+
+        bool camIsOpen = false;
 
         rt_mutex_acquire(&mutex_camera, TM_INFINITE);
         camera.Close();
         camIsOpen = camera.IsOpen();
         rt_mutex_release(&mutex_camera);
-    }
 
-    if(camIsOpen == false){
-    cout << "La camera est fermee" << endl << flush;
+        while(camIsOpen == true){
+
+            rt_mutex_acquire(&mutex_camera, TM_INFINITE);
+            camera.Close();
+            camIsOpen = camera.IsOpen();
+            rt_mutex_release(&mutex_camera);
+        }
+
+        if(camIsOpen == false){
+        cout << "La camera est fermee" << endl << flush;
+        }
     }
-    
 }
 
 /**
